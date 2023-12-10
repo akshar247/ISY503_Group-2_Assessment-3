@@ -165,6 +165,7 @@ joblib.dump(model, 'model.pkl')
 joblib_model = joblib.load('model.pkl')
 
 #Tokenize and pad the input sentence
+input_sentence = "This product is very wort! quality of product is very good"
 encoded_sentence = token.texts_to_sequences([input_sentence])
 padded_sentence = pad_sequences(encoded_sentence, maxlen=maxLength, padding='post', truncating='post')
 
