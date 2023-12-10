@@ -21,7 +21,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 import os
 
-
+#define function to extract reviews from dataset files 
 def extract_all_reviews(folder_path, filename):
     data = {'Review': []}
 
@@ -39,7 +39,7 @@ def extract_all_reviews(folder_path, filename):
     df = pd.DataFrame(data)
     return df
 
-
+#Extract review dataset of different product categories: dvd, books,electronics and kithcen & housewares
 negative_dvd_review = extract_all_reviews('./dvd', 'negative.review')
 positive_dvd_review = extract_all_reviews('./dvd', 'positive.review')
 negative_books_review = extract_all_reviews('./books', 'negative.review')
@@ -49,6 +49,7 @@ positive_electronics_review = extract_all_reviews('./electronics', 'positive.rev
 negative_kitchen_review = extract_all_reviews('./kitchen_&_housewares', 'negative.review')
 positive_kitchen_review = extract_all_reviews('./kitchen_&_housewares', 'positive.review')
 
+#Assign labels and types to each review dataset
 negative_dvd_review["label"] = 0
 positive_dvd_review["label"] = 1
 negative_books_review["label"] = 0
@@ -67,13 +68,15 @@ positive_electronics_review["type"] = "electronics"
 negative_kitchen_review["type"] = "kitchen"
 positive_kitchen_review["type"] = "kitchen"
 
+#combine all reviews into a single dataframe
 frames = [negative_dvd_review, positive_dvd_review, negative_books_review, positive_books_review,
           negative_electronics_review, positive_electronics_review, negative_kitchen_review, positive_kitchen_review]
 result = pd.concat(frames)
 
+#shuffle the dataframe
 df = result.sample(frac=1)
-df
 
+#Import necessary libraries and modules
 import numpy as np
 import joblib
 from sklearn.model_selection import train_test_split
@@ -85,10 +88,13 @@ from tensorflow.keras.layers import Embedding, LSTM, Dense
 from tensorflow.keras.callbacks import EarlyStopping
 from joblib import Parallel, delayed
 
+#convert reviews to lowercase
 df['Review'] = df['Review'].apply(lambda x: x.lower())
+df
 
 # !pip install nltk
 
+#import NLTK and download 'stopwords' and 'punkt'
 import nltk
 
 nltk.download("stopwords")
@@ -98,56 +104,72 @@ nltk.download('punkt')
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
-
+#Define function to remove stopwords from reviews
 def remove_stopWords(text):
     stopWords = set(stopwords.words('english'))
     word = word_tokenize(text)
     filtered_word = [word for word in word if word.lower() not in stopWords]
     return ' '.join(filtered_word)
-
+    #Apply stopword removal to reviews
     df['Review'] = df['Review'].apply(lambda x: remove_stopWords(x))
 
-
+#Encode labels using LabelEncoder
 label_encoder = LabelEncoder()
 df['Label'] = label_encoder.fit_transform(df['label'])
 
+#Filter reviews with a length less than or equal to 2
 df['Review_Length'] = df['Review'].apply(lambda x: len(x.split()))
 df = df[df['Review_Length'] > 2]
 
+#tokenize reviews
 token = Tokenizer()
 token.fit_on_texts(df['Review'])
 encoded_reviews = token.texts_to_sequences(df['Review'])
 
+#save the tokenizer
 joblib.dump(token, 'token.pkl')
 
+#Pad sequences to a maximum length of 20
 maxLength = 20
 paddedReviews = pad_sequences(encoded_reviews, maxlen=maxLength, padding='post', truncating='post')
 
+#split the dataset into training, validation and test sets
 train_data, test_data, train_labels, test_labels = train_test_split(paddedReviews, df['Label'], test_size=0.2,
                                                                     random_state=42)
 train_data, val_data, train_labels, val_labels = train_test_split(train_data, train_labels, test_size=0.2,
                                                                   random_state=42)
-
+#Define the model architecture
 embedding_dim = 50
 model = Sequential()
 model.add(Embedding(input_dim=len(token.word_index) + 1, output_dim=embedding_dim, input_length=maxLength))
 model.add(LSTM(100))
 model.add(Dense(1, activation='sigmoid'))
 
+#compile the model 
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
+#Implement early stopping to prevent overfitting
 earlyStopping = EarlyStopping(patience=3, restore_best_weights=True)
+
+#Train the model
 model.fit(train_data, train_labels, epochs=10, validation_data=(val_data, val_labels), callbacks=[earlyStopping])
 
+#Evaluate the model on the test dataset
 test_loss, test_accuracy = model.evaluate(test_data, test_labels)
 print("Test Loss: {test_loss}, Test Accuracy: {test_accuracy}")
 
+#save the trained model
 joblib.dump(model, 'model.pkl')
 
+#load the model
 joblib_model = joblib.load('model.pkl')
 
+#Tokenize and pad the input sentence
 encoded_sentence = token.texts_to_sequences([input_sentence])
 padded_sentence = pad_sequences(encoded_sentence, maxlen=maxLength, padding='post', truncating='post')
+
+#Predict the sentiment using the trained model
 predicted_sentiment = joblib_model.predict(padded_sentence)
 
+#Display the predicted sentiment
 predicted_sentiment
